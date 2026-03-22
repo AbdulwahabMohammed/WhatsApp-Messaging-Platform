@@ -9,7 +9,7 @@ export default function Targets() {
   const [selectedSession, setSelectedSession] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddContact, setShowAddContact] = useState(false);
-  const [newContact, setNewContact] = useState({ name: '', phone_number: '' });
+  const [newContact, setNewContact] = useState({ name: '', target_id: '', type: 'number' });
 
   const fetchTargets = async () => {
     try {
@@ -41,14 +41,23 @@ export default function Targets() {
     if (!selectedSession) return;
     setLoading(true);
     try {
-      await fetch('/api/targets/groups/sync', {
+      const res = await fetch('/api/targets/groups/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: selectedSession }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 501 || data.code === 'NOT_SUPPORTED') {
+          alert('Group syncing is not supported by your WhatsApp server version. You can add groups manually.');
+        } else {
+          alert(data.error || 'Failed to sync groups');
+        }
+      }
       fetchTargets();
     } catch (error) {
       console.error(error);
+      alert('An error occurred while syncing groups.');
     } finally {
       setLoading(false);
     }
@@ -58,14 +67,23 @@ export default function Targets() {
     if (!selectedSession) return;
     setLoading(true);
     try {
-      await fetch('/api/targets/channels/sync', {
+      const res = await fetch('/api/targets/channels/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: selectedSession }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 501 || data.code === 'NOT_SUPPORTED') {
+          alert('Channel syncing is not supported by your WhatsApp server version. You can add channels manually.');
+        } else {
+          alert(data.error || 'Failed to sync channels');
+        }
+      }
       fetchTargets();
     } catch (error) {
       console.error(error);
+      alert('An error occurred while syncing channels.');
     } finally {
       setLoading(false);
     }
@@ -73,19 +91,20 @@ export default function Targets() {
 
   const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSession || !newContact.phone_number) return;
+    if (!selectedSession || !newContact.target_id) return;
     setLoading(true);
     try {
-      await fetch('/api/targets/contact', {
+      await fetch('/api/targets/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: selectedSession,
-          phone_number: newContact.phone_number,
+          target_id: newContact.target_id,
           name: newContact.name,
+          type: newContact.type,
         }),
       });
-      setNewContact({ name: '', phone_number: '' });
+      setNewContact({ name: '', target_id: '', type: 'number' });
       setShowAddContact(false);
       fetchTargets();
     } catch (error) {
@@ -145,7 +164,7 @@ export default function Targets() {
           className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-2 disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
-          {t('add_contact')}
+          {t('add_target', 'Add Target')}
         </button>
       </div>
 
@@ -153,8 +172,20 @@ export default function Targets() {
       {showAddContact && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">{t('add_contact')}</h3>
+            <h3 className="text-lg font-bold mb-4">{t('add_target', 'Add Target')}</h3>
             <form onSubmit={handleAddContact} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('type')}</label>
+                <select
+                  value={newContact.type}
+                  onChange={(e) => setNewContact({ ...newContact, type: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="number">{t('number', 'Number')}</option>
+                  <option value="group">{t('group', 'Group')}</option>
+                  <option value="channel">{t('channel', 'Channel')}</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('name')}</label>
                 <input
@@ -166,13 +197,13 @@ export default function Targets() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('phone_number')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('target_id', 'Target ID (Phone, Group JID, Channel JID)')}</label>
                 <input
                   type="text"
-                  value={newContact.phone_number}
-                  onChange={(e) => setNewContact({ ...newContact, phone_number: e.target.value })}
+                  value={newContact.target_id}
+                  onChange={(e) => setNewContact({ ...newContact, target_id: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="e.g., 1234567890"
+                  placeholder="e.g., 1234567890 or 123@g.us"
                   required
                 />
               </div>

@@ -153,11 +153,11 @@ app.post('/api/targets/channels/sync', async (req, res) => {
   }
 });
 
-app.post('/api/targets/contact', (req, res) => {
-  const { session_id, phone_number, name } = req.body;
+app.post('/api/targets/manual', (req, res) => {
+  const { session_id, type, target_id, name } = req.body;
   try {
     const stmt = db.prepare('INSERT OR IGNORE INTO targets (id, session_id, type, target_id, name) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(uuidv4(), session_id, 'number', phone_number, name);
+    stmt.run(uuidv4(), session_id, type || 'number', target_id, name);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
