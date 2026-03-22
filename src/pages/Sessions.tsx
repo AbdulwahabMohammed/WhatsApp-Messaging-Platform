@@ -8,20 +8,53 @@ export default function Sessions() {
   const [newSessionId, setNewSessionId] = useState('');
   const [loading, setLoading] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     try {
       const res = await fetch('/api/sessions');
       const data = await res.json();
       setSessions(data);
+      return data;
     } catch (error) {
       console.error(error);
+      return [];
     }
   };
 
   useEffect(() => {
     fetchSessions();
   }, []);
+
+  // Poll for session status while QR modal is open
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (qrUrl && activeSessionId) {
+      interval = setInterval(async () => {
+        try {
+          // Check status in the background
+          await fetch(`/api/sessions/${activeSessionId}/status`);
+          const updatedSessions = await fetchSessions();
+          
+          // Find the current session
+          const currentSession = updatedSessions.find((s: any) => s.session_id === activeSessionId);
+          
+          // If connected, close the modal
+          if (currentSession && currentSession.status === 'CONNECTED') {
+            setQrUrl(null);
+            setActiveSessionId(null);
+          }
+        } catch (error) {
+          console.error('Error polling status:', error);
+        }
+      }, 3000); // Check every 3 seconds
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [qrUrl, activeSessionId]);
 
   const handleInitSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +90,7 @@ export default function Sessions() {
       const data = await res.json();
       if (data.url) {
         setQrUrl(data.url);
+        setActiveSessionId(id);
       }
     } catch (error) {
       console.error(error);
@@ -108,7 +142,10 @@ export default function Sessions() {
               />
             </div>
             <button
-              onClick={() => setQrUrl(null)}
+              onClick={() => {
+                setQrUrl(null);
+                setActiveSessionId(null);
+              }}
               className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors mt-auto"
             >
               {t('cancel')}

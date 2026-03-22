@@ -71,20 +71,42 @@ app.post('/api/targets/groups/sync', async (req, res) => {
   const { session_id } = req.body;
   try {
     const response = await whatsappService.getGroups(session_id);
-    const groups = response.data.groups || [];
+    let groups = response.data.groups || response.data || [];
+    
+    if (!Array.isArray(groups)) {
+      groups = [];
+    }
 
     const stmt = db.prepare('INSERT OR IGNORE INTO targets (id, session_id, type, target_id, name) VALUES (?, ?, ?, ?, ?)');
     
     const insertMany = db.transaction((groupsList) => {
       for (const group of groupsList) {
-        stmt.run(uuidv4(), session_id, 'group', group.id, group.name || group.subject);
+        let targetId, targetName;
+        if (typeof group === 'string') {
+          targetId = group;
+          targetName = group;
+        } else {
+          targetId = group.id?._serialized || group.id || group.jid;
+          targetName = group.name || group.subject || 'Unknown Group';
+        }
+
+        if (!targetId) {
+          console.warn('Skipping group without ID:', group);
+          continue;
+        }
+        stmt.run(uuidv4(), session_id, 'group', targetId, targetName);
       }
     });
     insertMany(groups);
 
     res.json({ success: true, count: groups.length });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error syncing groups:', error.response?.data || error.message);
+    const status = error.response?.status || 500;
+    res.status(status).json({ 
+      error: error.message, 
+      details: error.response?.data 
+    });
   }
 });
 
@@ -92,20 +114,42 @@ app.post('/api/targets/channels/sync', async (req, res) => {
   const { session_id } = req.body;
   try {
     const response = await whatsappService.getChannels(session_id);
-    const channels = response.data.channels || [];
+    let channels = response.data.channels || response.data || [];
+    
+    if (!Array.isArray(channels)) {
+      channels = [];
+    }
 
     const stmt = db.prepare('INSERT OR IGNORE INTO targets (id, session_id, type, target_id, name) VALUES (?, ?, ?, ?, ?)');
     
     const insertMany = db.transaction((channelList) => {
       for (const channel of channelList) {
-        stmt.run(uuidv4(), session_id, 'channel', channel.id, channel.name);
+        let targetId, targetName;
+        if (typeof channel === 'string') {
+          targetId = channel;
+          targetName = channel;
+        } else {
+          targetId = channel.id?._serialized || channel.id || channel.jid;
+          targetName = channel.name || channel.subject || 'Unknown Channel';
+        }
+
+        if (!targetId) {
+          console.warn('Skipping channel without ID:', channel);
+          continue;
+        }
+        stmt.run(uuidv4(), session_id, 'channel', targetId, targetName);
       }
     });
     insertMany(channels);
 
     res.json({ success: true, count: channels.length });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error syncing channels:', error.response?.data || error.message);
+    const status = error.response?.status || 500;
+    res.status(status).json({ 
+      error: error.message, 
+      details: error.response?.data 
+    });
   }
 });
 
