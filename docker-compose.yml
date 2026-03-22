@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  whatsapp-platform:
+    build: .
+    container_name: whatsapp-platform
+    restart: unless-stopped
+    ports:
+      - "${EXTERNAL_PORT:-8765}:3000"
+    environment:
+      - NODE_ENV=production
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL:-http://localhost:8080}
+      - WHATSAPP_API_KEY=${WHATSAPP_API_KEY:-dummy_api_key}
+      - APP_URL=${APP_URL:-http://localhost:8765}
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
