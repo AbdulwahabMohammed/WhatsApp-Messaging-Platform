@@ -96,15 +96,20 @@ export default function Sessions() {
 
       {/* QR Code Modal */}
       {qrUrl && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl shadow-lg max-w-2xl w-full h-[80vh] flex flex-col">
             <h3 className="text-lg font-bold mb-4">{t('scan_qr')}</h3>
-            <div className="bg-gray-100 p-4 rounded-lg flex justify-center mb-4">
-              <img src={qrUrl} alt="QR Code" className="max-w-full h-auto" />
+            <div className="flex-1 bg-gray-100 rounded-lg overflow-hidden mb-4 relative">
+              <iframe 
+                src={qrUrl} 
+                className="absolute inset-0 w-full h-full border-0"
+                title="QR Code Scanner"
+                sandbox="allow-scripts allow-same-origin"
+              />
             </div>
             <button
               onClick={() => setQrUrl(null)}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+              className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors mt-auto"
             >
               {t('cancel')}
             </button>

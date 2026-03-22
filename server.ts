@@ -56,48 +56,8 @@ app.get('/api/sessions/:id/status', async (req, res) => {
 
 app.get('/api/sessions/:id/scan', (req, res) => {
   const { id } = req.params;
-  // Instead of returning the external WhatsApp API URL directly,
-  // we return a local proxy URL so the browser can load it regardless of network setup.
-  const url = `/api/sessions/${id}/qr-image`;
+  const url = whatsappService.getScanUrl(id);
   res.json({ url });
-});
-
-app.get('/api/sessions/:id/qr-image', async (req, res) => {
-  const { id } = req.params;
-  try {
-    // Fetch the image from the WhatsApp API server
-    const response = await axios.get(`${process.env.WHATSAPP_API_URL || 'http://localhost:8080'}/wa/scan`, {
-      params: { session_id: id },
-      headers: { 'x-api-key': process.env.WHATSAPP_API_KEY || 'dummy_api_key' },
-      responseType: 'arraybuffer'
-    });
-    
-    const contentType = response.headers['content-type'];
-    
-    // Handle case where API returns JSON with base64 string
-    if (contentType && contentType.includes('application/json')) {
-      const data = JSON.parse(response.data.toString('utf-8'));
-      const qrData = data.qr || data.qrcode || data.base64;
-      if (qrData) {
-        const base64Data = qrData.replace(/^data:image\/\w+;base64,/, "");
-        const img = Buffer.from(base64Data, 'base64');
-        res.writeHead(200, {
-          'Content-Type': 'image/png',
-          'Content-Length': img.length
-        });
-        return res.end(img);
-      } else {
-        return res.status(404).send('QR code not found in response');
-      }
-    }
-
-    // Handle case where API returns the image directly
-    res.setHeader('Content-Type', contentType || 'image/png');
-    res.send(response.data);
-  } catch (error: any) {
-    console.error('Error fetching QR code:', error.message);
-    res.status(500).send('Error fetching QR code');
-  }
 });
 
 app.get('/api/sessions', (req, res) => {
