@@ -1,0 +1,5 @@
+{
+  "name": "WhatsApp Messaging Platform",
+  "description": "منصة متكاملة لإدارة جلسات واتساب، مزامنة جهات الاتصال، وإرسال الرسائل (نصوص، وسائط، ومرفقات) عبر واجهة برمجة التطبيقات.",
+  "requestFramePermissions": []
+}
