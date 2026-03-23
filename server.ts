@@ -161,24 +161,30 @@ app.post('/api/messages/send', upload.single('file'), async (req, res) => {
     if (target_type === 'channel') {
       if (message_type === 'text') {
         response = await whatsappService.sendChannelText(session_id, target_id, content, idempotencyKey, webhookUrl);
-      } else if (message_type === 'media' && file) {
-        response = await whatsappService.sendChannelMedia(session_id, target_id, file.path, idempotencyKey, webhookUrl);
-      } else if (message_type === 'attachment' && file) {
-        response = await whatsappService.sendChannelAttachment(session_id, target_id, content, file.path, idempotencyKey, webhookUrl);
-      } else if (message_type === 'mixed' && file) {
-        response = await whatsappService.sendChannelMixed(session_id, target_id, content, file.path, idempotencyKey, webhookUrl);
+      } else if (file) {
+        if (message_type === 'attachment') {
+          response = await whatsappService.sendChannelAttachment(session_id, target_id, content || '', file.path, idempotencyKey, webhookUrl);
+        } else if (message_type === 'mixed' || (message_type === 'media' && content)) {
+          // If it's mixed, or if it's media but has a caption, we must use the mixed endpoint
+          response = await whatsappService.sendChannelMixed(session_id, target_id, content || '', file.path, idempotencyKey, webhookUrl);
+        } else {
+          // Media only (no caption)
+          response = await whatsappService.sendChannelMedia(session_id, target_id, file.path, idempotencyKey, webhookUrl);
+        }
       }
     } else {
       // number or group
       if (message_type === 'text') {
         response = await whatsappService.sendText(session_id, target_type, target_id, content, idempotencyKey, webhookUrl);
-      } else if (message_type === 'media' && file) {
-        response = await whatsappService.sendMedia(session_id, target_type, target_id, content, file.path, idempotencyKey, webhookUrl);
+      } else if (file) {
+        // For numbers and groups, sendMedia handles all files and optional captions
+        response = await whatsappService.sendMedia(session_id, target_type, target_id, content || '', file.path, idempotencyKey, webhookUrl);
       }
     }
 
     // Update status
-    db.prepare('UPDATE messages SET status = ? WHERE id = ?').run('SENT', messageId);
+    const externalId = response?.data?.channel_message_id || response?.data?.id || response?.data?.message_id || null;
+    db.prepare('UPDATE messages SET status = ?, external_id = ? WHERE id = ?').run('SENT', externalId, messageId);
     db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(uuidv4(), messageId, 'SENT', JSON.stringify(response?.data || {}));
 
     res.json({ success: true, messageId, data: response?.data });
@@ -200,10 +206,24 @@ app.post('/api/webhooks/wa-status', (req, res) => {
   const payload = req.body;
   // payload should contain id (message_id), status, etc.
   try {
-    // Find message by external ID or idempotency key if possible, but for MVP we just log it
-    // If we had the internal messageId mapped to the external message_id, we'd update it here.
     const logId = uuidv4();
-    db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(logId, payload.id || 'unknown', payload.status || 'WEBHOOK_RECEIVED', JSON.stringify(payload));
+    const externalId = payload.channel_message_id || payload.id;
+    const status = payload.status || 'WEBHOOK_RECEIVED';
+
+    if (externalId) {
+      // Try to find the message by external_id
+      const msg = db.prepare('SELECT id FROM messages WHERE external_id = ?').get(externalId) as any;
+      if (msg) {
+        db.prepare('UPDATE messages SET status = ? WHERE id = ?').run(status, msg.id);
+        db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(logId, msg.id, status, JSON.stringify(payload));
+      } else {
+        // Fallback if not found
+        db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(logId, externalId, status, JSON.stringify(payload));
+      }
+    } else {
+      db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(logId, 'unknown', status, JSON.stringify(payload));
+    }
+    
     res.json({ success: true });
   } catch (error: any) {
     console.error('Webhook error:', error);

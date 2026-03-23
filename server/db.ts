@@ -38,6 +38,7 @@ db.exec(`
     file_path TEXT,
     status TEXT DEFAULT 'PENDING',
     idempotency_key TEXT UNIQUE NOT NULL,
+    external_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -49,5 +50,11 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN external_id TEXT;");
+} catch (e) {
+  // Ignore if column already exists
+}
 
 export default db;
