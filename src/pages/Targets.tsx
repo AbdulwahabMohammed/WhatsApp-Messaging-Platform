@@ -11,6 +11,12 @@ export default function Targets() {
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', target_id: '', type: 'number' });
 
+  // Sync Modal State
+  const [syncModal, setSyncModal] = useState<{ isOpen: boolean, type: 'group' | 'channel' }>({ isOpen: false, type: 'group' });
+  const [availableTargets, setAvailableTargets] = useState<any[]>([]);
+  const [selectedTargetIds, setSelectedTargetIds] = useState<Set<string>>(new Set());
+  const [isFetchingTargets, setIsFetchingTargets] = useState(false);
+
   const fetchTargets = async () => {
     try {
       const res = await fetch('/api/targets');
@@ -37,55 +43,92 @@ export default function Targets() {
     fetchSessions();
   }, []);
 
-  const handleSyncGroups = async () => {
+  const openSyncModal = async (type: 'group' | 'channel') => {
     if (!selectedSession) return;
-    setLoading(true);
+    setSyncModal({ isOpen: true, type });
+    setIsFetchingTargets(true);
+    setAvailableTargets([]);
+    setSelectedTargetIds(new Set());
+
     try {
-      const res = await fetch('/api/targets/groups/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: selectedSession }),
-      });
+      const endpoint = type === 'group' ? '/api/whatsapp/groups' : '/api/whatsapp/channels';
+      const res = await fetch(`${endpoint}?session_id=${selectedSession}`);
       const data = await res.json();
+
       if (!res.ok) {
         if (res.status === 501 || data.code === 'NOT_SUPPORTED') {
-          alert('Group syncing is not supported by your WhatsApp server version. You can add groups manually.');
+          alert(`${type === 'group' ? 'Group' : 'Channel'} syncing is not supported by your WhatsApp server version. You can add them manually.`);
         } else {
-          alert(data.error || 'Failed to sync groups');
+          alert(data.error || `Failed to fetch ${type}s`);
         }
+        setSyncModal({ isOpen: false, type });
+        return;
       }
+
+      const normalized = data.map((item: any) => {
+        if (typeof item === 'string') return { id: item, name: item };
+        return {
+          id: item.id?._serialized || item.id || item.jid,
+          name: item.name || item.subject || 'Unknown'
+        };
+      }).filter((item: any) => item.id);
+
+      setAvailableTargets(normalized);
+    } catch (error) {
+      console.error(error);
+      alert(`An error occurred while fetching ${type}s.`);
+      setSyncModal({ isOpen: false, type });
+    } finally {
+      setIsFetchingTargets(false);
+    }
+  };
+
+  const handleSaveSelectedTargets = async () => {
+    if (!selectedSession || selectedTargetIds.size === 0) return;
+    setLoading(true);
+    try {
+      const targetsToSave = availableTargets
+        .filter(t => selectedTargetIds.has(t.id))
+        .map(t => ({
+          target_id: t.id,
+          name: t.name,
+          type: syncModal.type
+        }));
+
+      await fetch('/api/targets/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: selectedSession,
+          targets: targetsToSave
+        })
+      });
+
+      setSyncModal({ isOpen: false, type: 'group' });
       fetchTargets();
     } catch (error) {
       console.error(error);
-      alert('An error occurred while syncing groups.');
+      alert('Failed to save selected targets');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSyncChannels = async () => {
-    if (!selectedSession) return;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/targets/channels/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: selectedSession }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 501 || data.code === 'NOT_SUPPORTED') {
-          alert('Channel syncing is not supported by your WhatsApp server version. You can add channels manually.');
-        } else {
-          alert(data.error || 'Failed to sync channels');
-        }
-      }
-      fetchTargets();
-    } catch (error) {
-      console.error(error);
-      alert('An error occurred while syncing channels.');
-    } finally {
-      setLoading(false);
+  const toggleTargetSelection = (id: string) => {
+    const newSet = new Set(selectedTargetIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedTargetIds(newSet);
+  };
+
+  const toggleAllTargets = () => {
+    if (selectedTargetIds.size === availableTargets.length) {
+      setSelectedTargetIds(new Set());
+    } else {
+      setSelectedTargetIds(new Set(availableTargets.map(t => t.id)));
     }
   };
 
@@ -143,7 +186,7 @@ export default function Targets() {
           </select>
         </div>
         <button
-          onClick={handleSyncGroups}
+          onClick={() => openSyncModal('group')}
           disabled={loading || !selectedSession}
           className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-2 disabled:opacity-50"
         >
@@ -151,7 +194,7 @@ export default function Targets() {
           {t('sync_groups')}
         </button>
         <button
-          onClick={handleSyncChannels}
+          onClick={() => openSyncModal('channel')}
           disabled={loading || !selectedSession}
           className="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 disabled:opacity-50"
         >
@@ -167,6 +210,78 @@ export default function Targets() {
           {t('add_target', 'Add Target')}
         </button>
       </div>
+
+      {/* Sync Modal */}
+      {syncModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <h3 className="text-lg font-bold mb-4 capitalize">
+              {t('select')} {syncModal.type}s
+            </h3>
+            
+            {isFetchingTargets ? (
+              <div className="flex-1 flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+              </div>
+            ) : availableTargets.length === 0 ? (
+              <div className="flex-1 py-8 text-center text-gray-500">
+                No {syncModal.type}s found.
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 flex items-center">
+                  <input
+                    type="checkbox"
+                    id="selectAll"
+                    checked={selectedTargetIds.size === availableTargets.length && availableTargets.length > 0}
+                    onChange={toggleAllTargets}
+                    className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                  />
+                  <label htmlFor="selectAll" className="ml-2 text-sm font-medium text-gray-700">
+                    {t('select_all', 'Select All')} ({selectedTargetIds.size}/{availableTargets.length})
+                  </label>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {availableTargets.map((target) => (
+                    <div key={target.id} className="flex items-center p-3 hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        id={`target-${target.id}`}
+                        checked={selectedTargetIds.has(target.id)}
+                        onChange={() => toggleTargetSelection(target.id)}
+                        className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      <label htmlFor={`target-${target.id}`} className="ml-3 flex flex-col cursor-pointer flex-1">
+                        <span className="text-sm font-medium text-gray-900">{target.name}</span>
+                        <span className="text-xs text-gray-500 font-mono">{target.id}</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setSyncModal({ isOpen: false, type: 'group' })}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveSelectedTargets}
+                disabled={loading || selectedTargetIds.size === 0 || isFetchingTargets}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {t('save_selected', 'Save Selected')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Contact Modal */}
       {showAddContact && (
