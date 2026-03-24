@@ -92,6 +92,14 @@ app.get('/api/whatsapp/channels', async (req, res) => {
   const { session_id } = req.query;
   try {
     const response = await whatsappService.getChannels(session_id as string);
+    
+    if (response.data && response.data.ok === false) {
+      if (response.data.code === 'NOT_SUPPORTED') {
+        return res.status(501).json({ code: 'NOT_SUPPORTED', error: 'Channel listing not supported by current Baileys build' });
+      }
+      return res.status(400).json(response.data);
+    }
+
     let channels = response.data.channels || response.data || [];
     
     if (!Array.isArray(channels)) {
@@ -102,9 +110,15 @@ app.get('/api/whatsapp/channels', async (req, res) => {
   } catch (error: any) {
     console.error('Error fetching channels:', error.response?.data || error.message);
     const status = error.response?.status || 500;
+    const data = error.response?.data || {};
+    
+    if (status === 501 || data.code === 'NOT_SUPPORTED') {
+      return res.status(501).json({ code: 'NOT_SUPPORTED', error: 'Channel listing not supported by current Baileys build' });
+    }
+
     res.status(status).json({ 
       error: error.message, 
-      details: error.response?.data 
+      details: data 
     });
   }
 });
@@ -170,6 +184,18 @@ app.post('/api/messages/send', upload.single('file'), async (req, res) => {
         } else {
           // Media only (no caption)
           response = await whatsappService.sendChannelMedia(session_id, target_id, file.path, idempotencyKey, webhookUrl);
+        }
+      }
+    } else if (target_type === 'channel_invite') {
+      if (message_type === 'text') {
+        response = await whatsappService.sendChannelTextByInvite(session_id, target_id, content, idempotencyKey, webhookUrl);
+      } else if (file) {
+        if (message_type === 'attachment') {
+          response = await whatsappService.sendChannelAttachmentByInvite(session_id, target_id, content || '', file.path, idempotencyKey, webhookUrl);
+        } else if (message_type === 'mixed' || (message_type === 'media' && content)) {
+          response = await whatsappService.sendChannelMixedByInvite(session_id, target_id, content || '', file.path, idempotencyKey, webhookUrl);
+        } else {
+          response = await whatsappService.sendChannelMediaByInvite(session_id, target_id, file.path, idempotencyKey, webhookUrl);
         }
       }
     } else {

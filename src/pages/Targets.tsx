@@ -299,6 +299,7 @@ export default function Targets() {
                   <option value="number">{t('number', 'Number')}</option>
                   <option value="group">{t('group', 'Group')}</option>
                   <option value="channel">{t('channel', 'Channel')}</option>
+                  <option value="channel_invite">{t('channel_invite', 'Channel Invite')}</option>
                 </select>
               </div>
               <div>
@@ -312,13 +313,15 @@ export default function Targets() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('target_id', 'Target ID (Phone, Group JID, Channel JID)')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {newContact.type === 'channel_invite' ? t('invite_url_code', 'Invite URL or Code') : t('target_id', 'Target ID (Phone, Group JID, Channel JID)')}
+                </label>
                 <input
                   type="text"
                   value={newContact.target_id}
                   onChange={(e) => setNewContact({ ...newContact, target_id: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="e.g., 1234567890 or 123@g.us"
+                  placeholder={newContact.type === 'channel_invite' ? "e.g., https://whatsapp.com/channel/... or CODE" : "e.g., 1234567890 or 123@g.us"}
                   required
                 />
               </div>

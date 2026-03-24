@@ -126,7 +126,7 @@ export default function Compose() {
                 <option value="" disabled>{t('select_target')}</option>
                 {filteredTargets.map(t => (
                   <option key={t.id} value={t.target_id}>
-                    {t.name || t.target_id} ({t.type})
+                    {t.name || t.target_id} ({t(t.type)})
                   </option>
                 ))}
               </select>

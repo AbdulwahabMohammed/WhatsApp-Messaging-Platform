@@ -122,5 +122,81 @@ export const whatsappService = {
         'x-idempotency-key': idempotencyKey,
       },
     });
+  },
+
+  sendChannelTextByInvite: async (sessionId: string, inviteUrlOrCode: string, text: string, idempotencyKey: string, webhookUrl?: string) => {
+    const payload: any = {
+      session_id: sessionId,
+      text,
+      webhook_url: webhookUrl,
+    };
+    if (inviteUrlOrCode.startsWith('http')) {
+      payload.invite_url = inviteUrlOrCode;
+    } else {
+      payload.invite_code = inviteUrlOrCode;
+    }
+
+    return client.post('/v3/channels/text/by-invite', payload, {
+      headers: { 'x-idempotency-key': idempotencyKey }
+    });
+  },
+
+  sendChannelMediaByInvite: async (sessionId: string, inviteUrlOrCode: string, filePath: string, idempotencyKey: string, webhookUrl?: string) => {
+    const form = new FormData();
+    form.append('session_id', sessionId);
+    if (inviteUrlOrCode.startsWith('http')) {
+      form.append('invite_url', inviteUrlOrCode);
+    } else {
+      form.append('invite_code', inviteUrlOrCode);
+    }
+    form.append('file', fs.createReadStream(filePath));
+    if (webhookUrl) form.append('webhook_url', webhookUrl);
+
+    return client.post('/v3/channels/media/by-invite', form, {
+      headers: {
+        ...form.getHeaders(),
+        'x-idempotency-key': idempotencyKey,
+      },
+    });
+  },
+
+  sendChannelAttachmentByInvite: async (sessionId: string, inviteUrlOrCode: string, text: string, filePath: string, idempotencyKey: string, webhookUrl?: string) => {
+    const form = new FormData();
+    form.append('session_id', sessionId);
+    if (inviteUrlOrCode.startsWith('http')) {
+      form.append('invite_url', inviteUrlOrCode);
+    } else {
+      form.append('invite_code', inviteUrlOrCode);
+    }
+    if (text) form.append('text', text);
+    form.append('file', fs.createReadStream(filePath));
+    if (webhookUrl) form.append('webhook_url', webhookUrl);
+
+    return client.post('/v3/channels/attachments/by-invite', form, {
+      headers: {
+        ...form.getHeaders(),
+        'x-idempotency-key': idempotencyKey,
+      },
+    });
+  },
+
+  sendChannelMixedByInvite: async (sessionId: string, inviteUrlOrCode: string, text: string, filePath: string, idempotencyKey: string, webhookUrl?: string) => {
+    const form = new FormData();
+    form.append('session_id', sessionId);
+    if (inviteUrlOrCode.startsWith('http')) {
+      form.append('invite_url', inviteUrlOrCode);
+    } else {
+      form.append('invite_code', inviteUrlOrCode);
+    }
+    if (text) form.append('text', text);
+    form.append('file', fs.createReadStream(filePath));
+    if (webhookUrl) form.append('webhook_url', webhookUrl);
+
+    return client.post('/v3/channels/mixed/by-invite', form, {
+      headers: {
+        ...form.getHeaders(),
+        'x-idempotency-key': idempotencyKey,
+      },
+    });
   }
 };

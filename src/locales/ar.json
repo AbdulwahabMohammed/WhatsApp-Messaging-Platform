@@ -37,6 +37,8 @@
   "person": "شخص",
   "group": "مجموعة",
   "channel": "قناة",
+  "channel_invite": "رابط/كود دعوة قناة",
+  "invite_url_code": "رابط أو كود الدعوة",
   "select_target": "اختر المستلم",
   "success": "نجاح",
   "error": "خطأ",

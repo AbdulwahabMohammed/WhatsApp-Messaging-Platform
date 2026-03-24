@@ -37,6 +37,8 @@
   "person": "Person",
   "group": "Group",
   "channel": "Channel",
+  "channel_invite": "Channel Invite URL/Code",
+  "invite_url_code": "Invite URL or Code",
   "select_target": "Select Target",
   "success": "Success",
   "error": "Error",
