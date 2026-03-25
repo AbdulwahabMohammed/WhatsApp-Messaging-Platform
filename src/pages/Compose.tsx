@@ -74,7 +74,8 @@ export default function Compose() {
         setFormData(prev => ({ ...prev, content: '' }));
         setFile(null);
       } else {
-        setStatusMsg({ type: 'error', text: data.error || t('error') });
+        const errorText = data.details ? `${data.error}: ${JSON.stringify(data.details)}` : data.error || t('error');
+        setStatusMsg({ type: 'error', text: errorText });
       }
     } catch (error: any) {
       setStatusMsg({ type: 'error', text: error.message });
@@ -124,9 +125,9 @@ export default function Compose() {
                 required
               >
                 <option value="" disabled>{t('select_target')}</option>
-                {filteredTargets.map(t => (
-                  <option key={t.id} value={t.target_id}>
-                    {t.name || t.target_id} ({t(t.type)})
+                {filteredTargets.map(target => (
+                  <option key={target.id} value={target.target_id}>
+                    {target.name || target.target_id} ({t(target.type)})
                   </option>
                 ))}
               </select>

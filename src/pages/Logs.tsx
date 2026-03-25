@@ -48,6 +48,7 @@ export default function Logs() {
               <th className="px-6 py-3 text-sm font-semibold text-gray-600">{t('target_id')}</th>
               <th className="px-6 py-3 text-sm font-semibold text-gray-600">{t('message_type')}</th>
               <th className="px-6 py-3 text-sm font-semibold text-gray-600">{t('status')}</th>
+              <th className="px-6 py-3 text-sm font-semibold text-gray-600">{t('details', 'Details')}</th>
               <th className="px-6 py-3 text-sm font-semibold text-gray-600">{t('created_at')}</th>
             </tr>
           </thead>
@@ -63,6 +64,9 @@ export default function Logs() {
                     <span className="text-sm font-medium text-gray-700">{t(msg.status.toLowerCase())}</span>
                   </div>
                 </td>
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={msg.details}>
+                  {msg.details || '-'}
+                </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {new Date(msg.created_at).toLocaleString()}
                 </td>
@@ -70,7 +74,7 @@ export default function Logs() {
             ))}
             {messages.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                   No messages found.
                 </td>
               </tr>

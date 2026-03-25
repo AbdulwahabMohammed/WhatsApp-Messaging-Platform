@@ -36,6 +36,7 @@ app.post('/api/sessions/init', async (req, res) => {
 
     res.json({ success: true, session_id });
   } catch (error: any) {
+    console.error(`Error initializing session ${session_id}:`, error.response?.data || error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -50,6 +51,7 @@ app.get('/api/sessions/:id/status', async (req, res) => {
 
     res.json(response.data);
   } catch (error: any) {
+    console.error(`Error getting status for session ${id}:`, error.response?.data || error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -137,6 +139,7 @@ app.post('/api/targets/bulk', (req, res) => {
 
     res.json({ success: true, count: targets.length });
   } catch (error: any) {
+    console.error('Error saving bulk targets:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -148,6 +151,7 @@ app.post('/api/targets/manual', (req, res) => {
     stmt.run(uuidv4(), session_id, type || 'number', target_id, name);
     res.json({ success: true });
   } catch (error: any) {
+    console.error('Error saving manual target:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -215,14 +219,20 @@ app.post('/api/messages/send', upload.single('file'), async (req, res) => {
 
     res.json({ success: true, messageId, data: response?.data });
   } catch (error: any) {
+    console.error('Error sending message:', error.response?.data || error.message);
     db.prepare('UPDATE messages SET status = ? WHERE id = ?').run('FAILED', messageId);
-    db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(uuidv4(), messageId, 'FAILED', error.message);
-    res.status(500).json({ error: error.message });
+    db.prepare('INSERT INTO message_logs (id, message_id, status, details) VALUES (?, ?, ?, ?)').run(uuidv4(), messageId, 'FAILED', JSON.stringify(error.response?.data || error.message));
+    res.status(500).json({ error: error.message, details: error.response?.data });
   }
 });
 
 app.get('/api/messages', (req, res) => {
-  const stmt = db.prepare('SELECT * FROM messages ORDER BY created_at DESC');
+  const stmt = db.prepare(`
+    SELECT m.*, 
+           (SELECT details FROM message_logs ml WHERE ml.message_id = m.id ORDER BY created_at DESC LIMIT 1) as details 
+    FROM messages m 
+    ORDER BY m.created_at DESC
+  `);
   const messages = stmt.all();
   res.json(messages);
 });

@@ -65,11 +65,17 @@ export default function Targets() {
         return;
       }
 
-      const normalized = data.map((item: any) => {
+      const normalized = (Array.isArray(data) ? data : []).map((item: any) => {
         if (typeof item === 'string') return { id: item, name: item };
+        
+        let name = item.name || item.subject || 'Unknown';
+        if (typeof name === 'object' && name !== null) {
+          name = name.text || name.name || name.subject || JSON.stringify(name);
+        }
+        
         return {
           id: item.id?._serialized || item.id || item.jid,
-          name: item.name || item.subject || 'Unknown'
+          name: name
         };
       }).filter((item: any) => item.id);
 
